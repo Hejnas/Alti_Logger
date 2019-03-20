@@ -1,0 +1,1 @@
+/home/lukasz/Arduino/projects/AltiLoggerDLG/AltiLoggerDLG.ino
