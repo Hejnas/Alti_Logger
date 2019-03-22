@@ -46,6 +46,8 @@ calcPressure	KEYWORD2
 calcTemperature	KEYWORD2
 calcAltitude	KEYWORD2
 
+selectFlash	KEYWORD2
+deselectFlash	KEYWORD2
 Flash_Manufacturer_ID	KEYWORD2
 Flash_Write_Enable	KEYWORD2
 Flash_Write_Disable	KEYWORD2
