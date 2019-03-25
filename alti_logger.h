@@ -1,5 +1,5 @@
-#ifndef _WINBONDFLASH_H__
-#define _WINBONDFLASH_H__
+#ifndef _ALTI_LOGGER_H__
+#define _ALTI_LOGGER_H__
 
 #define SERIAL_BAUD      		(115200)
 
@@ -22,6 +22,12 @@
 #define MS5611_PROM_C6 			(0xAC)
 #define MS5611_CMD_READ_PROM    (0xA0)
 
+#define Flash_CMD_page_program  (0x02)
+#define Flash_CMD_read_data     (0x03)
+#define Flash_max_addres        (4194303)   // 32Mbit = 4Mbyte = 4 x 1024 x 1024 = 4194304 max adress 419304 - 1
+#define Flash_FAT_0_addres      (32)
+#define Flash_data_0_addres     (64)
+
 // ...::: SERIAL :::...
 #define serial_TX1 				(PA9)
 #define serial_RX1 				(PA10)
@@ -33,8 +39,15 @@ extern uint32_t rawTemp, rawPress; // Digital pressure and temperature data
 extern int16_t Temperature;		// Calculate temperature
 extern uint32_t Pressure;			// Calculate pressure
 extern int16_t Altitude;			// Calculate altitude
+extern String input;
 
-void initLogger();
+extern double timeCount;   //licznik milisecund od power on
+
+uint8_t altiLogger_init();
+bool altiLogger_error(uint8_t error_num);
+bool sprawdzMode();
+void showLoggerHelp();
+
 void LEDping(uint8_t count);
 
 void selectMS5611();
@@ -57,5 +70,9 @@ void Flash_Write_Enable();
 void Flash_Write_Disable();
 bool FlashBusy();
 void FlashErase();
+uint32_t Flash_write_string(uint32_t addr, String str);
+uint8_t Flash_read_8bit(uint32_t addr);
+void Flash_write_8bit(uint32_t addr, uint8_t data);
+String measurement_to_FlashStringFormat();
 
 #endif

@@ -9,6 +9,8 @@ uint32_t rawTemp, rawPress; // Digital pressure and temperature data
 int16_t Temperature;		// Calculate temperature
 uint32_t Pressure;			// Calculate pressure
 int16_t Altitude;			// Calculate altitude
+double timeCount = 0;   //licznik milisecund od power on
+String input;
 
 
 // ---------------------------------------------------
@@ -16,13 +18,13 @@ int16_t Altitude;			// Calculate altitude
 //      init logger led, sensor and flash
 //
 // ---------------------------------------------------
-void initLogger()
+uint8_t altiLogger_init()
 {
 	// Init SPI
 	SPI.begin();
 	SPI.setBitOrder(MSBFIRST); // Set the SPI bit order
 	SPI.setDataMode(SPI_MODE0); //Set the  SPI_mode 0
-	SPI.setClockDivider(SPI_CLOCK_DIV8);      // Slow speed (72 / 8 = 9 MHz SPI_1 speed)
+	SPI.setClockDivider(SPI_CLOCK_DIV8);      // Speed (72 / 8 = 9 MHz SPI_1 speed)
 	
 	// LED
 	pinMode(pinLED, OUTPUT);
@@ -52,7 +54,101 @@ void initLogger()
 	readConv();
 	referencePressure = calcPressure();
 	
+	return 0;
+	
 }
+
+
+// ---------------------------------------------------
+//
+//      Flsh_print_mem - print all write mem
+//
+// ---------------------------------------------------
+bool altiLogger_error(uint8_t error_num)
+{
+
+  uint8_t LEDping_count;
+  String error_desc;
+
+  if(error_num==3){ //Flash mem is not formated
+    LEDping_count = 4;
+    error_desc = "Flash mem is not formatted";
+  }
+  
+  if(error_num==100){ //error return value altiLogger_error
+    while(1){
+		Serial.println("error return value altiLogger_error");
+		LEDping(32);
+		delay(500);
+	}    
+  }
+  
+  
+  LEDping_count = 32;
+  error_desc = "unknow error";
+  
+  while(1)
+  {
+
+    //show and print error info
+    LEDping(LEDping_count);
+    Serial.println(error_desc);
+    Serial.println("fixed it or more info send 'PC' command");
+    delay(500);
+
+    //sheck serial commend "PC" avilable
+    if (Serial.available() > 0) { //sprawdz czy nie ma komendy
+      input = Serial.readString();
+      if (input.indexOf("PC") > -1) return true;
+    }
+  }
+  return false;
+}//end of altiLogger_error
+
+
+// ---------------------------------------------------
+//
+//      check PC connection
+//
+// ---------------------------------------------------
+bool sprawdzMode()
+{
+  
+  uint16_t x = 0xB4A3;
+  
+  pinMode(serial_TX1, OUTPUT);
+  pinMode(serial_RX1, INPUT_PULLUP);
+  digitalWrite(pinLED, LOW);
+  
+  for (int8_t i=0;i<16;i++)
+  {
+    digitalWrite(serial_TX1, bitRead(x,i));
+    if(digitalRead(serial_RX1)!=bitRead(x,i)) return true;
+  }
+  return false;
+  
+}//end of sprawdzMode()
+
+
+// ---------------------------------------------------
+//
+//      showLoggerHelp
+//
+// ---------------------------------------------------
+void showLoggerHelp()
+{
+  
+  Serial.print("DLG LOGGER ");
+        Serial.println("v0.2");
+        Serial.println("lista komend:");        
+        Serial.println("   start - wyświetlania pomiarów");
+        Serial.println("   stop - wyświetlania pomiarów");
+        Serial.println("   read - ...");
+        Serial.println("   erase - kasuj pamięć flash");
+        Serial.println("   identyfikator - wyświatl");
+        Serial.println("   help - to menu");
+  
+}//end of showLoggerHelp
 
 
 // ---------------------------------------------------
@@ -68,20 +164,20 @@ void deselectFlash(){ digitalWrite(FLASH_SS, HIGH);}
 
 // ---------------------------------------------------
 //
-//      mrugnięcie LEDem na PC13
+//      50ms LED blink - PC13
 //
 // ---------------------------------------------------
-
-void LEDping(uint8_t count)
-{ 
-  for (uint16_t i=0;i<count;i++)
-  {
-    digitalWrite(pinLED, LOW);
-    delay(50);
-    digitalWrite(pinLED, HIGH);
-    delay(50);
-  }
+void LEDping(uint8_t count){ 
+	
+	for(uint8_t i=0;i<count;i++){	//50ms LED blink
+		digitalWrite(pinLED, LOW);
+		delay(50);
+		digitalWrite(pinLED, HIGH);
+		delay(50);
+	}
+	
 }//end of LEDping
+
 
 // ---------------------------------------------------
 //
@@ -109,13 +205,11 @@ void wyswietlCx(){
 //      odczytaj 8 bity z MS5611
 //
 // ---------------------------------------------------
-uint8_t MS5611_read_8bits(uint8_t reg)
+uint8_t MS5611_read_8bits(uint8_t addr)
 {
-  uint8_t dump;
   uint8_t return_value;
-  uint8_t addr = reg;
   selectMS5611();
-  dump = SPI.transfer(addr);
+  SPI.transfer(addr);
   return_value = SPI.transfer(0);
   deselectMS5611();
   return return_value;
@@ -127,17 +221,14 @@ uint8_t MS5611_read_8bits(uint8_t reg)
 //      odczytaj 16 bity z MS5611
 //
 // ---------------------------------------------------
-uint16_t MS5611_read_16bits(uint8_t reg)
+uint16_t MS5611_read_16bits(uint8_t addr)
 {
-  uint8_t dump, byteH, byteL;
   uint16_t return_value;
-  uint8_t addr = reg;
   selectMS5611();
-  dump = SPI.transfer(addr);
-  byteH = SPI.transfer(0);
-  byteL = SPI.transfer(0);
+  SPI.transfer(addr);
+  return_value = SPI.transfer(0) << 8;
+  return_value = return_value + SPI.transfer(0);
   deselectMS5611();
-  return_value = ((uint16_t)byteH<<8) | (byteL);
   return return_value;
 }//end of MS5611_read_16bits
 
@@ -147,18 +238,15 @@ uint16_t MS5611_read_16bits(uint8_t reg)
 //      odczytaj 24 bity z MS5611
 //
 // ---------------------------------------------------
-uint32_t MS5611_read_24bits(uint8_t reg)
+uint32_t MS5611_read_24bits(uint8_t addr)
 {
-  uint8_t dump,byteH,byteM,byteL;
   uint32_t return_value;
-  uint8_t addr = reg;
   selectMS5611();
-  dump = SPI.transfer(addr);
-  byteH = SPI.transfer(0);
-  byteM = SPI.transfer(0);
-  byteL = SPI.transfer(0);
+  SPI.transfer(addr);
+  return_value = SPI.transfer(0) << 16;
+  return_value = return_value + SPI.transfer(0) << 8;
+  return_value = return_value + SPI.transfer(0);
   deselectMS5611();
-  return_value = (((uint32_t)byteH)<<16) | (((uint32_t)byteM)<<8) | (byteL);
   return return_value;
 }//end of MS5611_read_24bits
 
@@ -168,12 +256,10 @@ uint32_t MS5611_read_24bits(uint8_t reg)
 //      zapisz 8 bitów do MS5611
 //
 // ---------------------------------------------------
-
-void MS5611_write(uint8_t reg)
+void MS5611_write(uint8_t addr)
 {
-  uint8_t dump;
   selectMS5611();
-  dump = SPI.transfer(reg);
+  SPI.transfer(addr);
   deselectMS5611();
 }//end of MS5611_write
 
@@ -379,3 +465,111 @@ void FlashErase()
   while(FlashBusy());
 }
 
+
+// ---------------------------------------------------
+//
+//      Flash_write_string
+//      zapisuje pod wskazany adres flash ciąg
+//      i zwraca nowy dres flash
+//
+// ---------------------------------------------------
+uint32_t Flash_write_string(uint32_t addr, String str){
+  
+  while(FlashBusy());
+  Flash_Write_Enable();
+  selectFlash();
+  SPI.transfer(Flash_CMD_page_program);       //Flash page program
+  SPI.transfer(addr>>16);                 //High byte
+  SPI.transfer(addr>>8);                  //Middle byte
+  SPI.transfer(addr);                     //Low byte
+  for(int i = 0; i < str.length(); i++){  //write str to Flash
+    SPI.transfer(str.charAt(i));
+  }
+  deselectFlash();
+  Flash_Write_Disable();
+  addr = addr + str.length(); //przelicz adres
+  return addr;
+  
+}//end of Flash_write_string
+
+
+// ---------------------------------------------------
+//
+//      Flash_read_8bit
+//
+// ---------------------------------------------------
+uint8_t Flash_read_8bit(uint32_t addr)
+{
+  
+  while(FlashBusy());
+
+  uint8_t return_value;
+  uint8_t byteH = addr >> 16;
+  uint8_t byteM = addr >> 8;
+  uint8_t byteL = addr;
+
+  selectFlash();
+  SPI.transfer(Flash_CMD_read_data);
+  SPI.transfer(byteH);
+  SPI.transfer(byteM);
+  SPI.transfer(byteL);
+  return_value = SPI.transfer(0x00);
+  deselectFlash();
+  
+  return return_value;
+  
+}//end of Flash_read_8bit
+
+
+// ---------------------------------------------------
+//
+//      Flash_write_8bit
+//
+// ---------------------------------------------------
+void Flash_write_8bit(uint32_t addr, uint8_t data)
+{
+  
+  while(FlashBusy());
+
+  uint8_t byteH = addr >> 16;
+  uint8_t byteM = addr >> 8;
+  uint8_t byteL = addr;
+
+  Flash_Write_Enable();
+  selectFlash();
+  SPI.transfer(Flash_CMD_page_program);
+  SPI.transfer(byteH);
+  SPI.transfer(byteM);
+  SPI.transfer(byteL);
+  SPI.transfer(data);
+  deselectFlash();
+  Flash_Write_Disable();
+  
+}//end of Flash_write_8bit
+
+
+// ---------------------------------------------------
+//
+//      measurement_to_FlashStringFormat
+//      zwraca zformatowwane dane do zapisu do Flash
+//
+// ---------------------------------------------------
+String measurement_to_FlashStringFormat()
+{
+  
+  double zmienna = 0;
+  String dane = "";
+
+  zmienna = timeCount;
+  zmienna = zmienna/1000;
+  dane = String(zmienna,3) + ";";
+  zmienna = Temperature;
+  zmienna = zmienna / 10;
+  dane = dane + String(zmienna,1) + ";";
+  zmienna = Altitude;
+  zmienna = zmienna / 10;
+  dane = dane + String(zmienna,1) + "\r\n";
+
+  return dane;
+  
+}//end of measurement_to_FlashStringFormat

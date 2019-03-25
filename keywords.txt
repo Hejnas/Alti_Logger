@@ -33,7 +33,11 @@ Temperature	KEYWORD2
 Pressure	KEYWORD2
 Altitude	KEYWORD2
 
-initLogger KEYWORD2
+altiLogger_init KEYWORD2
+altiLogger_error KEYWORD2
+sprawdzMode KEYWORD2
+showLoggerHelp KEYWORD2
+
 LEDping	KEYWORD2
 wyswietlCx	KEYWORD2
 MS5611_read_8bits	KEYWORD2
@@ -53,3 +57,7 @@ Flash_Write_Enable	KEYWORD2
 Flash_Write_Disable	KEYWORD2
 FlashBusy	KEYWORD2
 FlashErase	KEYWORD2
+Flash_write_string	KEYWORD2
+Flash_read_8bit	KEYWORD2
+Flash_write_8bit	KEYWORD2
+measurement_to_FlashStringFormat	KEYWORD2
