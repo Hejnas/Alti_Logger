@@ -1,32 +1,30 @@
 uinti8_t altiLogger_init()
 	
-	1)	set SS MS5661, Flash and LED pin as output and set value
+	-	set SS MS5661, Flash and LED pin as output and set value
 	
-	2)	SPI init
+	-	SPI init
 	
-	3)	LED init
-	
-	4)	MS5611_init
+	-	MS5611 check connection
 			if C1 == 0x00 or 0xff then return 2 //error nr 2 "MS5611 not connect"
 		
-	5)	MS5611 reset
+	-	MS5611 reset
 	
-	6)	delay(100)
+	-	delay(100)
 	
-	7)	MS5611 read C1-6
+	-	MS5611 read calibration data
 	
-	8) 	MS5611 read referencePresure
+	- 	MS5611 read referencePresure
 	
-	9) 	Flash_init
+	- 	Flash check connection
 			if manufacture != 0xFE then return 3 //error nr 3 "Flash not connect"
 			
-	10) Flash check logger_id at the beginning of memory
+	-	 Flash check logger_id at the beginning of memory
 			if != ltiLogger_ID then return 4 //error 4 "Flash memory not formated"
 	
-	11)	check TX1 and RX1 connent
+	-	check TX1 and RX1 connent
 			if no connect then PCmode return 5 //PCmode "altiLogger is connented to PC"
 	
-	12) return 1
+	-	 return 1
 	
 	
 	

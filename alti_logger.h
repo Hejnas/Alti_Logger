@@ -49,6 +49,8 @@ bool sprawdzMode();
 void showLoggerHelp();
 
 void LEDping(uint8_t count);
+void LEDon();
+void LEDoff();
 
 void selectMS5611();
 void deselectMS5611();

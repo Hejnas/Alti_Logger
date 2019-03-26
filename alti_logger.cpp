@@ -9,7 +9,7 @@ uint32_t rawTemp, rawPress; // Digital pressure and temperature data
 int16_t Temperature;		// Calculate temperature
 uint32_t Pressure;			// Calculate pressure
 int16_t Altitude;			// Calculate altitude
-double timeCount = 0;   //licznik milisecund od power on
+double timeCount = 0;   	//licznik milisecund od power on
 String input;
 
 
@@ -20,41 +20,63 @@ String input;
 // ---------------------------------------------------
 uint8_t altiLogger_init()
 {
-	// Init SPI
+	
+//set SS MS5661, Flash and LED pin as output and set value
+	
+	pinMode(pinLED, OUTPUT);		//LED
+	LEDping(3);
+	LEDon();
+	
+	pinMode(MS5611_SS, OUTPUT); 	//MS5611
+	deselectMS5611();
+	
+	pinMode(FLASH_SS, OUTPUT); 		// W25Q32
+	deselectFlash();
+		
+//Init SPI
+	
 	SPI.begin();
-	SPI.setBitOrder(MSBFIRST); // Set the SPI bit order
-	SPI.setDataMode(SPI_MODE0); //Set the  SPI_mode 0
-	SPI.setClockDivider(SPI_CLOCK_DIV8);      // Speed (72 / 8 = 9 MHz SPI_1 speed)
+	SPI.setBitOrder(MSBFIRST); 				// Set the SPI bit order
+	SPI.setDataMode(SPI_MODE0); 			//Set the  SPI_mode 0
+	SPI.setClockDivider(SPI_CLOCK_DIV8);    // Speed (72 / 8 = 9 MHz SPI_1 speed)
 	
-	// LED
-	pinMode(pinLED, OUTPUT);
-	digitalWrite(pinLED, LOW);
+//MS5611 check connection
+//if C1 == 0x00 or 0xff then return 2 //error nr 2 "MS5611 not connect"
 	
-	// MS5611
-	pinMode(MS5611_SS, OUTPUT); // Define MS5611 NSS bit
-	deselectMS5611(); // manually take CSN high between spi transmissions
+	//under constraction
 	
-	// W25Q32
-	pinMode(FLASH_SS, OUTPUT); // Define MS5611 NSS bit
-	deselectFlash(); // manually take CSN high between spi transmissions
-	
-	//reset MS5611
+//MS5611 reset
 	MS5611_write(MS5611_CMD_RESET);
-	delay(20);
-  
-	//read calibration data
+	delay(100);
+	
+//MS5611 read calibration data
 	C1 = MS5611_read_16bits(MS5611_PROM_C1);
 	C2 = MS5611_read_16bits(MS5611_PROM_C2);
 	C3 = MS5611_read_16bits(MS5611_PROM_C3);
 	C4 = MS5611_read_16bits(MS5611_PROM_C4);
 	C5 = MS5611_read_16bits(MS5611_PROM_C5);
 	C6 = MS5611_read_16bits(MS5611_PROM_C6);
-
-	//read referencePressure
+	
+//MS5611 read referencePresure
 	readConv();
 	referencePressure = calcPressure();
 	
-	return 0;
+//Flash check connection
+//if manufacture != 0xFE then return 3 //error nr 3 "Flash not connect"
+	
+	//under constraction
+	
+//Flash check logger_id at the beginning of memory
+//if != ltiLogger_ID then return 4 //error 4 "Flash memory not formated"
+	
+	//under constraction
+	
+//check TX1 and RX1 connent
+//if no connect then PCmode return 5 //PCmode "altiLogger is connented to PC"
+	
+	//under constraction	
+	
+	return 1;
 	
 }
 
@@ -177,6 +199,15 @@ void LEDping(uint8_t count){
 	}
 	
 }//end of LEDping
+
+
+// ---------------------------------------------------
+//
+//      LEDon and LEDoff
+//
+// ---------------------------------------------------
+void LEDon(){digitalWrite(pinLED, LOW);}
+void LEDoff(){digitalWrite(pinLED, HIGH);}
 
 
 // ---------------------------------------------------
