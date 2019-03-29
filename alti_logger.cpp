@@ -12,14 +12,25 @@ int16_t Altitude;			// Calculate altitude
 double timeCount = 0;   	//licznik milisecund od power on
 String input;
 
+const String altiLogger_ID = "DLG_LOGGER_20090605";
+const String altiLogger_ver = "v0.2";
+const String altiLogger_file_extension = ".csv";
 
-// ---------------------------------------------------
-//
-//      init logger led, sensor and flash
-//
-// ---------------------------------------------------
+
+/*
+ *  ---------------------------------------------------
+ *  
+ *      init logger led, sensor and flash
+ * 		return  1  	altiLogger mode
+ * 		return	2	MS5611 no connected
+ * 		return	3	Flash not connected
+ * 		return	4	Flash not formated
+ * 		return	5	logger connected to PC
+ *  
+ *   ---------------------------------------------------*/
 uint8_t altiLogger_init()
 {
+	uint8_t x;
 	
 //set SS MS5661, Flash and LED pin as output and set value
 	
@@ -40,11 +51,6 @@ uint8_t altiLogger_init()
 	SPI.setDataMode(SPI_MODE0); 			//Set the  SPI_mode 0
 	SPI.setClockDivider(SPI_CLOCK_DIV8);    // Speed (72 / 8 = 9 MHz SPI_1 speed)
 	
-//MS5611 check connection
-//if C1 == 0x00 or 0xff then return 2 //error nr 2 "MS5611 not connect"
-	
-	//under constraction
-	
 //MS5611 reset
 	MS5611_write(MS5611_CMD_RESET);
 	delay(100);
@@ -57,47 +63,83 @@ uint8_t altiLogger_init()
 	C5 = MS5611_read_16bits(MS5611_PROM_C5);
 	C6 = MS5611_read_16bits(MS5611_PROM_C6);
 	
+//MS5611 check connection
+//if C1 == 0x00 or 0xff then return 2 //error nr 2 "MS5611 not connect"
+	
+	if((C1==0x0000) || (C1==0xFFFF)) return 2;
+	if((C2==0x0000) || (C2==0xFFFF)) return 2;
+	if((C3==0x0000) || (C3==0xFFFF)) return 2;
+	if((C4==0x0000) || (C4==0xFFFF)) return 2;
+	if((C5==0x0000) || (C5==0xFFFF)) return 2;
+	if((C6==0x0000) || (C6==0xFFFF)) return 2;
+	
 //MS5611 read referencePresure
 	readConv();
 	referencePressure = calcPressure();
 	
 //Flash check connection
-//if manufacture != 0xFE then return 3 //error nr 3 "Flash not connect"
+//if manufacture != 0xFE or device != 0x15 then return 3 //error nr 3 "Flash not connect"
 	
-	//under constraction
+	selectFlash();
+	SPI.transfer(0x90);	//read ID command
+	SPI.transfer(0);
+	SPI.transfer(0);
+	if(SPI.transfer(0)!=Flash_manufacturer_ID) return 3;
+	if(SPI.transfer(0)!=Flash_W25Q32_ID_8bit) return 3;
+	deselectFlash();
 	
 //Flash check logger_id at the beginning of memory
 //if != ltiLogger_ID then return 4 //error 4 "Flash memory not formated"
 	
-	//under constraction
+	x = altiLogger_ID.length();
+	String buffer = "";
+	
+	selectFlash();
+	SPI.transfer(Flash_CMD_read_data);
+	SPI.transfer(0x00);
+	SPI.transfer(0x00);
+	SPI.transfer(0x00);
+	for(uint8_t i=0;i<x;i++){
+		buffer = buffer + String(SPI.transfer(i));
+	}
+	deselectFlash();
+	if(buffer!=altiLogger_ID) return 4;	
+	
 	
 //check TX1 and RX1 connent
 //if no connect then PCmode return 5 //PCmode "altiLogger is connented to PC"
 	
-	//under constraction	
+	x = 0xCA;
+	pinMode(serial_TX1, OUTPUT);
+	pinMode(serial_RX1, INPUT_PULLUP);
+	for (int8_t i=0;i<8;i++)
+	{
+		digitalWrite(serial_TX1, bitRead(x,i));
+		if(digitalRead(serial_RX1)!=bitRead(x,i)) return 5;
+	}
 	
-	return 1;
+	return 1;	//no error and altiLogger_mode
 	
 }
 
 
-// ---------------------------------------------------
-//
-//      Flsh_print_mem - print all write mem
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      Flsh_print_mem - print all write mem
+ *
+ * ---------------------------------------------------*/
 bool altiLogger_error(uint8_t error_num)
 {
 
   uint8_t LEDping_count;
   String error_desc;
 
-  if(error_num==3){ //Flash mem is not formated
+  if(error_num==3){		//Flash mem is not formated
     LEDping_count = 4;
     error_desc = "Flash mem is not formatted";
   }
   
-  if(error_num==100){ //error return value altiLogger_error
+  if(error_num==100){		//error return value altiLogger_error
     while(1){
 		Serial.println("error return value altiLogger_error");
 		LEDping(32);
@@ -128,15 +170,15 @@ bool altiLogger_error(uint8_t error_num)
 }//end of altiLogger_error
 
 
-// ---------------------------------------------------
-//
-//      check PC connection
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      check PC connection
+ *
+ * ---------------------------------------------------*/
 bool sprawdzMode()
 {
   
-  uint16_t x = 0xB4A3;
+  uint16_t x = 0xB4;
   
   pinMode(serial_TX1, OUTPUT);
   pinMode(serial_RX1, INPUT_PULLUP);
@@ -152,11 +194,11 @@ bool sprawdzMode()
 }//end of sprawdzMode()
 
 
-// ---------------------------------------------------
-//
-//      showLoggerHelp
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      showLoggerHelp
+ *
+ * ---------------------------------------------------*/
 void showLoggerHelp()
 {
   
@@ -173,22 +215,22 @@ void showLoggerHelp()
 }//end of showLoggerHelp
 
 
-// ---------------------------------------------------
-//
-//      select and deselect MS5611 and Flash
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      select and deselect MS5611 and Flash
+ *
+ * ---------------------------------------------------*/
 void selectMS5611(){ digitalWrite(MS5611_SS, LOW);}
 void deselectMS5611(){ digitalWrite(MS5611_SS, HIGH);}
 void selectFlash(){ digitalWrite(FLASH_SS, LOW);}
 void deselectFlash(){ digitalWrite(FLASH_SS, HIGH);}
 
 
-// ---------------------------------------------------
-//
-//      50ms LED blink - PC13
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      50ms LED blink - PC13
+ *
+ * ---------------------------------------------------*/
 void LEDping(uint8_t count){ 
 	
 	for(uint8_t i=0;i<count;i++){	//50ms LED blink
@@ -201,20 +243,20 @@ void LEDping(uint8_t count){
 }//end of LEDping
 
 
-// ---------------------------------------------------
-//
-//      LEDon and LEDoff
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      LEDon and LEDoff
+ *
+ * ---------------------------------------------------*/
 void LEDon(){digitalWrite(pinLED, LOW);}
 void LEDoff(){digitalWrite(pinLED, HIGH);}
 
 
-// ---------------------------------------------------
-//
-//      wyswietlCx
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      wyswietlCx
+ *
+ * ---------------------------------------------------*/
 void wyswietlCx(){
   Serial.print("C1: ");
   Serial.print(C1);
@@ -231,11 +273,11 @@ void wyswietlCx(){
 }//end of wyswietlCx
 
 
-// ---------------------------------------------------
-//
-//      odczytaj 8 bity z MS5611
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      odczytaj 8 bity z MS5611
+ *
+ * ---------------------------------------------------*/
 uint8_t MS5611_read_8bits(uint8_t addr)
 {
   uint8_t return_value;
@@ -247,11 +289,11 @@ uint8_t MS5611_read_8bits(uint8_t addr)
 }//end of MS5611_read_8bits
 
 
-// ---------------------------------------------------
-//
-//      odczytaj 16 bity z MS5611
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      odczytaj 16 bity z MS5611
+ *
+ * ---------------------------------------------------*/
 uint16_t MS5611_read_16bits(uint8_t addr)
 {
   uint16_t return_value;
@@ -264,11 +306,11 @@ uint16_t MS5611_read_16bits(uint8_t addr)
 }//end of MS5611_read_16bits
 
 
-// ---------------------------------------------------
-//
-//      odczytaj 24 bity z MS5611
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      odczytaj 24 bity z MS5611
+ *
+ * ---------------------------------------------------*/
 uint32_t MS5611_read_24bits(uint8_t addr)
 {
   uint32_t return_value;
@@ -282,11 +324,11 @@ uint32_t MS5611_read_24bits(uint8_t addr)
 }//end of MS5611_read_24bits
 
 
-// ---------------------------------------------------
-//
-//      zapisz 8 bitów do MS5611
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      zapisz 8 bitów do MS5611
+ *
+ * ---------------------------------------------------*/
 void MS5611_write(uint8_t addr)
 {
   selectMS5611();
@@ -295,11 +337,11 @@ void MS5611_write(uint8_t addr)
 }//end of MS5611_write
 
 
-// ---------------------------------------------------
-//
-//      odczytaj rawTemp i rawPress z MS5611
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      odczytaj rawTemp i rawPress z MS5611
+ *
+ * ---------------------------------------------------*/
 void readConv(void){
 
   //odczyt raw ciśnienia
@@ -315,11 +357,11 @@ void readConv(void){
 }// end of readConv
 
 
-// ---------------------------------------------------
-//
-//      odczytaj i kalkulacja parametrów
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      odczytaj i kalkulacja parametrów
+ *
+ * ---------------------------------------------------*/
 void readParameters()
 {
 
@@ -333,11 +375,11 @@ void readParameters()
 }//end of readParameters
 
 
-// ---------------------------------------------------
-//
-//      kalkulacja ciśnienia MS5611
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      kalkulacja ciśnienia MS5611
+ *
+ * ---------------------------------------------------*/
 uint32_t calcPressure()
 {
     uint32_t D1 = rawPress;
@@ -375,11 +417,11 @@ uint32_t calcPressure()
     return P;
 }//end of calcPressure
 
-// ---------------------------------------------------
-//
-//      kalkulacja temperatury MS5611
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      kalkulacja temperatury MS5611
+ *
+ * ---------------------------------------------------*/
 int16_t calcTemperature()
 {
     uint32_t D2 = rawTemp;
@@ -400,11 +442,11 @@ int16_t calcTemperature()
 }//end of calcTemperature
 
 
-// ---------------------------------------------------
-//
-//      kalkulacja wysokości MS5611
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      kalkulacja wysokości MS5611
+ *
+ * ---------------------------------------------------*/
 int16_t calcAltitude(double pressure, double seaLevelPressure)
 {
     //double seaLevelPressure = 101325;
@@ -414,11 +456,11 @@ int16_t calcAltitude(double pressure, double seaLevelPressure)
 }//end of calcAltitude
 
 
-// ---------------------------------------------------
-//
-//      read flash manufactured ID
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      read flash manufactured ID
+ *
+ * ---------------------------------------------------*/
 uint8_t Flash_Manufacturer_ID()
 {
   uint8_t dump;
@@ -434,11 +476,11 @@ uint8_t Flash_Manufacturer_ID()
 }//end of Flash_Manufacturer_ID
 
 
-// ---------------------------------------------------
-//
-//      flash write enable
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      flash write enable
+ *
+ * ---------------------------------------------------*/
 void Flash_Write_Enable()
 {
   uint8_t dump;
@@ -448,11 +490,11 @@ void Flash_Write_Enable()
 }//end of Flash_Write_Enable
 
 
-// ---------------------------------------------------
-//
-//      flash write disable
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      flash write disable
+ *
+ * ---------------------------------------------------*/
 void Flash_Write_Disable()
 {
   uint8_t dump;
@@ -462,11 +504,11 @@ void Flash_Write_Disable()
 }//end of Flash_Write_Disable
 
 
-// ---------------------------------------------------
-//
-//      check busy Flash
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      check busy Flash
+ *
+ * ---------------------------------------------------*/
 bool FlashBusy()
 {
   uint8_t dump;
@@ -480,11 +522,11 @@ bool FlashBusy()
 }
 
 
-// ---------------------------------------------------
-//
-//      Flash chip erase
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      Flash chip erase
+ *
+ * ---------------------------------------------------*/
 void FlashErase()
 {
   Flash_Write_Enable();
@@ -497,13 +539,13 @@ void FlashErase()
 }
 
 
-// ---------------------------------------------------
-//
-//      Flash_write_string
-//      zapisuje pod wskazany adres flash ciąg
-//      i zwraca nowy dres flash
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      Flash_write_string
+ *      zapisuje pod wskazany adres flash ciąg
+ *      i zwraca nowy dres flash
+ *
+ * ---------------------------------------------------*/
 uint32_t Flash_write_string(uint32_t addr, String str){
   
   while(FlashBusy());
@@ -524,11 +566,11 @@ uint32_t Flash_write_string(uint32_t addr, String str){
 }//end of Flash_write_string
 
 
-// ---------------------------------------------------
-//
-//      Flash_read_8bit
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      Flash_read_8bit
+ *
+ * ---------------------------------------------------*/
 uint8_t Flash_read_8bit(uint32_t addr)
 {
   
@@ -552,11 +594,11 @@ uint8_t Flash_read_8bit(uint32_t addr)
 }//end of Flash_read_8bit
 
 
-// ---------------------------------------------------
-//
-//      Flash_write_8bit
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      Flash_write_8bit
+ *
+ * ---------------------------------------------------*/
 void Flash_write_8bit(uint32_t addr, uint8_t data)
 {
   
@@ -579,12 +621,12 @@ void Flash_write_8bit(uint32_t addr, uint8_t data)
 }//end of Flash_write_8bit
 
 
-// ---------------------------------------------------
-//
-//      measurement_to_FlashStringFormat
-//      zwraca zformatowwane dane do zapisu do Flash
-//
-// ---------------------------------------------------
+/* ---------------------------------------------------
+ *
+ *      measurement_to_FlashStringFormat
+ *      zwraca zformatowwane dane do zapisu do Flash
+ *
+ * ---------------------------------------------------*/
 String measurement_to_FlashStringFormat()
 {
   

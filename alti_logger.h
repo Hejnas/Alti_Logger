@@ -27,6 +27,8 @@
 #define Flash_max_addres        (4194303)   // 32Mbit = 4Mbyte = 4 x 1024 x 1024 = 4194304 max adress 419304 - 1
 #define Flash_FAT_0_addres      (32)
 #define Flash_data_0_addres     (64)
+#define Flash_manufacturer_ID	(0xEF)
+#define Flash_W25Q32_ID_8bit	(0x15)
 
 // ...::: SERIAL :::...
 #define serial_TX1 				(PA9)
@@ -42,6 +44,10 @@ extern int16_t Altitude;			// Calculate altitude
 extern String input;
 
 extern double timeCount;   //licznik milisecund od power on
+
+extern const String altiLogger_ID;
+extern const String altiLogger_ver;
+extern const String altiLogger_file_extension;
 
 uint8_t altiLogger_init();
 bool altiLogger_error(uint8_t error_num);
